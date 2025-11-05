@@ -1,0 +1,40 @@
+name: Publish to GCP Artifact Registry
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Required for Workload Identity Federation
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17' # Use your desired Java version
+          distribution: 'temurin'
+          # For Maven
+          server-id: artifact-registry 
+          # For Gradle (if needed)
+          # username: _json_key
+          # password: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }} 
+     - name: Configure Maven for Artifact Registry
+        run: |
+          gcloud artifacts print-settings mvn --project=${{ secrets.GCP_PROJECT_ID }} --repository=${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }} --location=${{ secrets.GCP_ARTIFACT_REGISTRY_LOCATION }} >> settings.xml
+          # Append the content of settings.xml to the global Maven settings file
+          cat settings.xml >> ~/.m2/settings.xml
+     - name: Build and Publish Maven packages
+        run: mvn clean deploy -s ~/.m2/settings.xml
